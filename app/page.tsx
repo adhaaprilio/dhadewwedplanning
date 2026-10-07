@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 const WEDDING_DATE = new Date("2027-12-12T08:00:00+07:00");
 const LAMARAN_DATE = new Date("2027-07-03T08:00:00+07:00");
@@ -19,7 +19,7 @@ const initialChecklist: ChecklistItem[] = [
     category: "Keluarga",
     due: "Mar 2027",
   },
- 
+  
 ];
 
 function getCountdown(target: Date) {
@@ -54,9 +54,19 @@ function formatRupiah(value: number) {
 }
 
 export default function Home() {
-  const [countdown, setCountdown] = useState(
-    getCountdown(WEDDING_DATE)
-  );
+  /*
+   * Initial value dibuat statis.
+   * Jangan memanggil new Date() di initial render
+   * agar aman dari Next.js SSR / hydration.
+   */
+  const [countdown, setCountdown] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  const [daysToLamaran, setDaysToLamaran] = useState(0);
 
   const [savedMoney, setSavedMoney] = useState(0);
 
@@ -67,25 +77,80 @@ export default function Home() {
 
   const weddingBudget = 50_000_000;
 
+  /*
+   * Wedding countdown
+   */
   useEffect(() => {
-    const timer = setInterval(() => {
+    const updateCountdown = () => {
       setCountdown(getCountdown(WEDDING_DATE));
-    }, 1000);
+    };
+
+    // Hitung langsung setelah component mounted
+    updateCountdown();
+
+    // Update setiap detik
+    const timer = setInterval(updateCountdown, 1000);
 
     return () => clearInterval(timer);
   }, []);
 
+  /*
+   * Lamaran countdown
+   */
+  useEffect(() => {
+    const updateLamaranCountdown = () => {
+      const now = new Date();
+
+      const difference =
+        LAMARAN_DATE.getTime() - now.getTime();
+
+      const days = Math.max(
+        0,
+        Math.ceil(
+          difference / (1000 * 60 * 60 * 24)
+        )
+      );
+
+      setDaysToLamaran(days);
+    };
+
+    // Hitung langsung setelah component mounted
+    updateLamaranCountdown();
+
+    // Update setiap jam
+    const timer = setInterval(
+      updateLamaranCountdown,
+      60 * 60 * 1000
+    );
+
+    return () => clearInterval(timer);
+  }, []);
+
+  /*
+   * Wedding budget progress
+   */
   const progress = Math.min(
-    Math.round((savedMoney / weddingBudget) * 100),
+    Math.round(
+      (savedMoney / weddingBudget) * 100
+    ),
     100
   );
 
+  /*
+   * Checklist progress
+   */
   const completedCount = completed.length;
 
-  const checklistProgress = Math.round(
-    (completedCount / checklist.length) * 100
-  );
+  const checklistProgress =
+    checklist.length > 0
+      ? Math.round(
+          (completedCount / checklist.length) * 100
+        )
+      : 0;
 
+  /*
+   * Toggle checklist
+   */
   const toggleChecklist = (id: number) => {
     setCompleted((current) =>
       current.includes(id)
@@ -93,17 +158,6 @@ export default function Home() {
         : [...current, id]
     );
   };
-
-  const daysToLamaran = useMemo(() => {
-    const now = new Date();
-    const diff =
-      LAMARAN_DATE.getTime() - now.getTime();
-
-    return Math.max(
-      0,
-      Math.ceil(diff / (1000 * 60 * 60 * 24))
-    );
-  }, []);
 
   return (
     <main className="min-h-screen bg-[#faf9f7] text-[#292725]">
